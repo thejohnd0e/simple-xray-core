@@ -37,12 +37,12 @@ touch "$KEYFILE"
 UUID=$("$INSTALL_DIR/xray" uuid)
 echo "uuid: $UUID" >> "$KEYFILE"
 
-"$INSTALL_DIR/xray" x25519 >> "$KEYFILE"       # adds Public/Private key pair
+"$INSTALL_DIR/xray" x25519 >> "$KEYFILE"     # adds Public/Private key pair
 SHORT_ID=$(openssl rand -hex 8)
 echo "shortsid: $SHORT_ID" >> "$KEYFILE"
 
 PRIV_KEY=$(awk -F': ' '/Private key/ {print $2}' "$KEYFILE")
-PUB_KEY=$(awk   -F': ' '/Public key/  {print $2}' "$KEYFILE")
+PUB_KEY=$(awk  -F': ' '/Public key/  {print $2}' "$KEYFILE")
 
 ### 4.  Write config.json (VLESS + Reality) ####################################
 cat > "$CONFIG_DIR/config.json" <<EOF
@@ -124,8 +124,8 @@ keys="/usr/local/etc/xray/.keys"
 proto=$(jq -r '.inbounds[0].protocol' "$cfg")
 port=$(jq -r '.inbounds[0].port' "$cfg")
 uuid=$(awk -F': ' '/uuid/ {print $2}' "$keys")
-pbk=$( awk -F': ' '/Public key/ {print $2}' "$keys")
-sid=$( awk -F': ' '/shortsid/  {print $2}' "$keys")
+pbk=$(awk -F': ' '/Public key/ {print $2}' "$keys")
+sid=$(awk -F': ' '/shortsid/  {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
 ip=$(curl -s icanhazip.com)
 
@@ -215,10 +215,32 @@ echo "$link" | qrencode -t ansiutf8
 EOS
 chmod +x /usr/local/bin/sharelink
 
+### 7.  OPTIONAL: create ~/help cheat-sheet ####################################
+cat > "$HOME/help" <<'EOF'
+Xray user-management commands:
+
+    mainuser   – show main user link & QR
+    userlist   – list every user
+    newuser    – create a new user
+    rmuser     – delete a user
+    sharelink  – choose user and print link / QR
+
+Config file:
+
+    /usr/local/etc/xray/config.json
+
+Restart Xray:
+
+    systemctl restart xray
+EOF
+chmod 644 "$HOME/help"
+
+### 8.  Final banner ###########################################################
 echo -e "\n[✓] Installation complete. Use the following commands:\n
   mainuser   - show main user link & QR
   userlist   - list users
   newuser    - add user
   rmuser     - remove user
   sharelink  - choose user and print link/QR\n"
+
 mainuser
