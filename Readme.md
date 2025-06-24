@@ -19,7 +19,7 @@ The service offers over 36 locations. If you don't need a specific country, choo
 The script was created and tested on Debian 12 x64. It may not work correctly on other operating systems. To download and run the script, use the following command:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/blob/main/xray-install | bash
+wget -qO- https://github.com/thejohnd0e/simple-xray-core/blob/main/xray-install | bash
 ```
 ## User Management Commands
 
