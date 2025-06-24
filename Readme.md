@@ -4,7 +4,7 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 
 ## VPS for the Panel
 
-To install the panel, you will need a VPS server. You can purchase one from [ishosting](https://bit.ly/3rOqvPE).
+To install the panel, you will need any VPS server.
 The service offers over 36 locations. If you don't need a specific country, choose the one closest to you.
 
 ## System Requirements
@@ -19,9 +19,8 @@ The service offers over 36 locations. If you don't need a specific country, choo
 The script was created and tested on Debian 12 x64. It may not work correctly on other operating systems. To download and run the script, use the following command:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/ServerTechnologies/simple-xray-core/refs/heads/main/xray-install | bash
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/blob/main/xray-install | bash
 ```
-
 ## User Management Commands
 
 **Show a list of all clients:**
