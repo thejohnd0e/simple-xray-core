@@ -64,7 +64,7 @@ cat help
 ## Useful Links
 
 * [X-ray Core GitHub Repository](https://github.com/XTLS/Xray-core)
-* [Official Documentation (Russian)](https://xtls.github.io/ru/)
+* [Official Documentation](https://xtls.github.io/en/)
 
 ## Client Apps for Connecting
 
