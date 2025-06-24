@@ -21,6 +21,8 @@ rm -f /usr/local/bin/mainuser
 rm -f /usr/local/bin/userlist
 rm -f /usr/local/bin/xray-install
 
+rm "$HOME/help"
+
 echo "[+] Optional: cleaning up unused packages (you can comment this out if needed)..."
 apt remove --purge -y qrencode jq curl 2>/dev/null || true
 apt autoremove -y 2>/dev/null || true
