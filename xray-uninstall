@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e
+
+echo "[+] Stopping xray.service (if running)..."
+systemctl stop xray.service 2>/dev/null || true
+systemctl disable xray.service 2>/dev/null || true
+
+echo "[+] Removing Xray binary..."
+rm -f /usr/local/bin/xray
+
+echo "[+] Removing config and keys..."
+rm -rf /usr/local/etc/xray
+
+echo "[+] Removing systemd service..."
+rm -f /etc/systemd/system/xray.service
+systemctl daemon-reload
+
+echo "[+] Removing helper scripts (mainuser, userlist)..."
+rm -f /usr/local/bin/mainuser
+rm -f /usr/local/bin/userlist
+rm -f /usr/local/bin/xray-install
+
+echo "[+] Optional: cleaning up unused packages (you can comment this out if needed)..."
+apt remove --purge -y qrencode jq curl 2>/dev/null || true
+apt autoremove -y 2>/dev/null || true
+
+echo "[✓] Xray and all related files removed."
