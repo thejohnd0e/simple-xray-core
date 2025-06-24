@@ -70,6 +70,7 @@ cat help
 
 **Windows**
 
+* [Nekoray](https://github.com/MatsuriDayo/nekoray)
 * [v2rayN](https://github.com/2dust/v2rayN)
 * [Furious](https://github.com/LorenEteval/Furious)
 * [Invisible Man - Xray](https://github.com/InvisibleManVPN/InvisibleMan-XRayClient)
