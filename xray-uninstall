@@ -16,12 +16,17 @@ echo "[+] Removing systemd service..."
 rm -f /etc/systemd/system/xray.service
 systemctl daemon-reload
 
-echo "[+] Removing helper scripts (mainuser, userlist)..."
-rm -f /usr/local/bin/mainuser
-rm -f /usr/local/bin/userlist
-rm -f /usr/local/bin/xray-install
+echo "[+] Removing helper scripts (mainuser, userlist, newuser, rmuser, sharelink)..."
+rm -f /usr/local/bin/mainuser \
+      /usr/local/bin/userlist \
+      /usr/local/bin/newuser \
+      /usr/local/bin/rmuser \
+      /usr/local/bin/sharelink \
+      /usr/local/bin/xray-install
 
-rm "$HOME/help"
+echo "[+] Removing help file..."
+rm -f "$HOME/help"           # -f, чтобы не упасть, если файла нет
+
 
 echo "[+] Optional: cleaning up unused packages (you can comment this out if needed)..."
 apt remove --purge -y qrencode jq curl 2>/dev/null || true
