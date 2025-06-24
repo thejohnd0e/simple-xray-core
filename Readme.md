@@ -11,11 +11,18 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 
 ## How to Use the Script
 
-The script was created and tested on Debian 12 x64. It may not work correctly on other operating systems. To download and run the script, use the following command:
+To download and run the script, use the following command:
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install | bash
 ```
+
+To uninstall the script, use the following command:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-uninstall | bash
+```
+
 ## User Management Commands
 
 **Show a list of all clients:**
