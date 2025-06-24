@@ -25,7 +25,7 @@ rm -f /usr/local/bin/mainuser \
       /usr/local/bin/xray-install
 
 echo "[+] Removing help file..."
-rm -f "$HOME/help"           # -f, чтобы не упасть, если файла нет
+rm -f "$HOME/help"           
 
 
 echo "[+] Optional: cleaning up unused packages (you can comment this out if needed)..."
