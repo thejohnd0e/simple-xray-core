@@ -10,8 +10,10 @@ if sysctl -n net.ipv4.tcp_congestion_control | grep -q bbr; then
     echo "[+] BBR already enabled"
 else
     echo "[+] Enabling BBR"
-    { echo "net.core.default_qdisc=fq"
-      echo "net.ipv4.tcp_congestion_control=bbr"; } >> /etc/sysctl.conf
+    {
+      echo "net.core.default_qdisc=fq"
+      echo "net.ipv4.tcp_congestion_control=bbr"
+    } >> /etc/sysctl.conf
     sysctl -p
 fi
 
@@ -20,8 +22,9 @@ XRAY_VERSION="v25.6.8"
 XRAY_ZIP="Xray-linux-64.zip"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/usr/local/etc/xray"
+DAT_DIR="/usr/local/share/xray"
 
-mkdir -p "$CONFIG_DIR"
+mkdir -p "$CONFIG_DIR" "$DAT_DIR"
 cd /tmp
 echo "[+] Downloading Xray $XRAY_VERSION …"
 wget -q "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${XRAY_ZIP}" -O xray.zip
@@ -30,25 +33,32 @@ chmod +x "$INSTALL_DIR/xray"
 rm -f xray.zip
 echo "[+] Xray installed to $INSTALL_DIR/xray"
 
-### 3.  Generate keys & UUID ###################################################
+### 3.  Download geosite / geoip ##############################################
+echo "[+] Downloading geosite / geoip …"
+curl -Lo "$DAT_DIR/geosite.dat" \
+     https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+curl -Lo "$DAT_DIR/geoip.dat" \
+     https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+# продублируем рядом с бинарником — Xray ищет сначала там
+cp "$DAT_DIR"/*.dat "$INSTALL_DIR/"
+
+### 4.  Generate keys & UUID ###################################################
 KEYFILE="$CONFIG_DIR/.keys"
-touch "$KEYFILE"
-
 UUID=$("$INSTALL_DIR/xray" uuid)
-echo "uuid: $UUID" >> "$KEYFILE"
-
-"$INSTALL_DIR/xray" x25519 >> "$KEYFILE"     # adds Public/Private key pair
-SHORT_ID=$(openssl rand -hex 8)
-echo "shortsid: $SHORT_ID" >> "$KEYFILE"
+{
+  echo "uuid: $UUID"
+  "$INSTALL_DIR/xray" x25519
+  echo "shortsid: $(openssl rand -hex 8)"
+} > "$KEYFILE"
 
 PRIV_KEY=$(awk -F': ' '/Private key/ {print $2}' "$KEYFILE")
 PUB_KEY=$(awk  -F': ' '/Public key/  {print $2}' "$KEYFILE")
+SHORT_ID=$(awk -F': ' '/shortsid/   {print $2}' "$KEYFILE")
 
-### 4.  Write config.json (VLESS + Reality) ####################################
+### 5.  Write config.json (VLESS + Reality) ####################################
 cat > "$CONFIG_DIR/config.json" <<EOF
 {
   "log": { "loglevel": "warning" },
-
   "routing": {
     "domainStrategy": "IPIfNonMatch",
     "rules": [
@@ -56,7 +66,6 @@ cat > "$CONFIG_DIR/config.json" <<EOF
       { "type": "field", "ip": ["geoip:cn"], "outboundTag": "block" }
     ]
   },
-
   "inbounds": [
     {
       "listen": "0.0.0.0",
@@ -83,18 +92,16 @@ cat > "$CONFIG_DIR/config.json" <<EOF
       "sniffing": { "enabled": true, "destOverride": ["http","tls"] }
     }
   ],
-
   "outbounds": [
     { "protocol": "freedom",  "tag": "direct" },
     { "protocol": "blackhole","tag": "block"  }
   ],
-
   "policy": { "levels": { "0": { "handshake": 3, "connIdle": 180 } } }
 }
 EOF
 echo "[+] Config written to $CONFIG_DIR/config.json"
 
-### 5.  Systemd service ########################################################
+### 6.  Systemd service ########################################################
 SERVICE_FILE="/etc/systemd/system/xray.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
@@ -115,7 +122,8 @@ systemctl enable xray
 systemctl restart xray
 echo "[+] Xray service started"
 
-### 6.  Helper scripts #########################################################
+### 7.  Helper scripts #########################################################
+# --- mainuser ---
 cat > /usr/local/bin/mainuser <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
@@ -124,8 +132,8 @@ keys="/usr/local/etc/xray/.keys"
 proto=$(jq -r '.inbounds[0].protocol' "$cfg")
 port=$(jq -r '.inbounds[0].port' "$cfg")
 uuid=$(awk -F': ' '/uuid/ {print $2}' "$keys")
-pbk=$(awk -F': ' '/Public key/ {print $2}' "$keys")
-sid=$(awk -F': ' '/shortsid/  {print $2}' "$keys")
+pbk=$(awk  -F': ' '/Public key/ {print $2}' "$keys")
+sid=$(awk  -F': ' '/shortsid/  {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
 ip=$(curl -s icanhazip.com)
 
@@ -136,27 +144,26 @@ echo "$link" | qrencode -t ansiutf8
 EOS
 chmod +x /usr/local/bin/mainuser
 
+# --- userlist ---
 cat > /usr/local/bin/userlist <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
 emails=( $(jq -r '.inbounds[0].settings.clients[].email' "$cfg") )
-if [[ ${#emails[@]} -eq 0 ]]; then
-  echo "No users found."
-  exit 0
-fi
+[[ ${#emails[@]} -eq 0 ]] && { echo "No users found."; exit 0; }
 for i in "${!emails[@]}"; do
   printf "%2d) %s\n" $((i+1)) "${emails[$i]}"
 done
 EOS
 chmod +x /usr/local/bin/userlist
 
+# --- newuser ---
 cat > /usr/local/bin/newuser <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
 read -rp "Enter new user e-mail: " email
 [[ -z $email ]] && { echo "Empty email – abort."; exit 1; }
-if jq -e --arg e "$email" '.inbounds[0].settings.clients[].email|select(.==$e)' "$cfg" > /dev/null; then
-    echo "User already exists."; exit 1
+if jq -e --arg e "$email" '.inbounds[0].settings.clients[].email|select(.==$e)' "$cfg" >/dev/null; then
+  echo "User already exists."; exit 1
 fi
 uuid=$(xray uuid)
 tmp=$(mktemp)
@@ -169,6 +176,7 @@ echo "User created."
 EOS
 chmod +x /usr/local/bin/newuser
 
+# --- rmuser ---
 cat > /usr/local/bin/rmuser <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
@@ -185,6 +193,7 @@ echo "User $email deleted."
 EOS
 chmod +x /usr/local/bin/rmuser
 
+# --- sharelink ---
 cat > /usr/local/bin/sharelink <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
@@ -215,7 +224,7 @@ echo "$link" | qrencode -t ansiutf8
 EOS
 chmod +x /usr/local/bin/sharelink
 
-### 7.  OPTIONAL: create ~/help cheat-sheet ####################################
+### 8.  OPTIONAL: create ~/help cheat-sheet ####################################
 cat > "$HOME/help" <<'EOF'
 Xray user-management commands:
 
@@ -235,7 +244,7 @@ Restart Xray:
 EOF
 chmod 644 "$HOME/help"
 
-### 8.  Final banner ###########################################################
+### 9.  Final banner ###########################################################
 echo -e "\n[✓] Installation complete. Use the following commands:\n
   mainuser   - show main user link & QR
   userlist   - list users
