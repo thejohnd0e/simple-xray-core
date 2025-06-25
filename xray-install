@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# --- check wget ---
+if ! command -v wget >/dev/null 2>&1; then
+    echo "[+] wget not found — installing..."
+    apt update && apt install -y wget
+fi
+
 ### 0.  Basic packages #########################################################
 apt update
 apt install -y curl jq qrencode unzip openssl
