@@ -1,35 +1,31 @@
 #!/bin/bash
-
 set -e
 
-echo "[+] Stopping xray.service (if running)..."
-systemctl stop xray.service 2>/dev/null || true
+echo "[+] Stopping xray.service (if running)…"
+systemctl stop    xray.service 2>/dev/null || true
 systemctl disable xray.service 2>/dev/null || true
 
-echo "[+] Removing Xray binary..."
-rm -f /usr/local/bin/xray
+echo "[+] Removing Xray binary & geo-files in /usr/local/bin…"
+rm -f /usr/local/bin/xray \
+      /usr/local/bin/geosite.dat \
+      /usr/local/bin/geoip.dat
 
-echo "[+] Removing config and keys..."
-rm -rf /usr/local/etc/xray
+echo "[+] Removing config, keys and share-data…"
+rm -rf /usr/local/etc/xray          # config + .keys
+rm -rf /usr/local/share/xray        # geosite/geoip master copies
 
-echo "[+] Removing systemd service..."
+echo "[+] Removing systemd unit…"
 rm -f /etc/systemd/system/xray.service
 systemctl daemon-reload
 
-echo "[+] Removing helper scripts (mainuser, userlist, newuser, rmuser, sharelink)..."
-rm -f /usr/local/bin/mainuser \
-      /usr/local/bin/userlist \
-      /usr/local/bin/newuser \
-      /usr/local/bin/rmuser \
-      /usr/local/bin/sharelink \
-      /usr/local/bin/xray-install
+echo "[+] Removing helper scripts…"
+rm -f /usr/local/bin/{mainuser,userlist,newuser,rmuser,sharelink,xray-install}
 
-echo "[+] Removing help file..."
-rm -f "$HOME/help"           
+echo "[+] Removing help file…"
+rm -f "$HOME/help"
 
-
-echo "[+] Optional: cleaning up unused packages (you can comment this out if needed)..."
+echo "[+] Optional: purge helper packages (comment out if you need them)…"
 apt remove --purge -y qrencode jq curl 2>/dev/null || true
-apt autoremove -y 2>/dev/null || true
+apt autoremove      -y                           2>/dev/null || true
 
 echo "[✓] Xray and all related files removed."
