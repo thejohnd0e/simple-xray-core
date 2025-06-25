@@ -11,13 +11,13 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 
 ## How to Use the Script
 
-To download and run the script, use the following command:
+To download and run the X-ray, use the following command:
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install | bash
 ```
 
-To uninstall the script, use the following command:
+To uninstall the X-ray, use the following command:
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-uninstall | bash
