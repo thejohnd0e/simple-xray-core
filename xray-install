@@ -136,25 +136,26 @@ cfg="/usr/local/etc/xray/config.json"
 keys="/usr/local/etc/xray/.keys"
 
 proto=$(jq -r '.inbounds[0].protocol' "$cfg")
-port=$(jq -r '.inbounds[0].port' "$cfg")
-uuid=$(awk -F': ' '/uuid/ {print $2}' "$keys")
-pbk=$(awk  -F': ' '/Public key/ {print $2}' "$keys")
-sid=$(awk  -F': ' '/shortsid/  {print $2}' "$keys")
+port=$(jq -r '.inbounds[0].port'      "$cfg")
+uuid=$(awk  -F': ' '/uuid/        {print $2}' "$keys")
+pbk=$(awk   -F': ' '/Public key/  {print $2}' "$keys")
+sid=$(awk   -F': ' '/shortsid/    {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
-ip=$(curl -4 -s icanhazip.com)
+ip=$(curl -4 -s ifconfig.me)                # ← только IPv4
 
 link="$proto://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#vless-$ip"
-echo -e "\nConnection link:\n$link\n"
+printf "\nConnection link:\n%s\n\n" "$link"
 echo "QR code:"
 echo "$link" | qrencode -t ansiutf8
 EOS
 chmod +x /usr/local/bin/mainuser
 
+
 # --- userlist ---
 cat > /usr/local/bin/userlist <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
-emails=( $(jq -r '.inbounds[0].settings.clients[].email' "$cfg") )
+mapfile -t emails < <(jq -r '.inbounds[0].settings.clients[].email' "$cfg")
 [[ ${#emails[@]} -eq 0 ]] && { echo "No users found."; exit 0; }
 for i in "${!emails[@]}"; do
   printf "%2d) %s\n" $((i+1)) "${emails[$i]}"
@@ -162,13 +163,14 @@ done
 EOS
 chmod +x /usr/local/bin/userlist
 
+
 # --- newuser ---
 cat > /usr/local/bin/newuser <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
 read -rp "Enter new user e-mail: " email
 [[ -z $email ]] && { echo "Empty email – abort."; exit 1; }
-if jq -e --arg e "$email" '.inbounds[0].settings.clients[].email|select(.==$e)' "$cfg" >/dev/null; then
+if jq -e --arg e "$email" '.inbounds[0].settings.clients[].email|index($e)' "$cfg" >/dev/null; then
   echo "User already exists."; exit 1
 fi
 uuid=$(xray uuid)
@@ -182,22 +184,27 @@ echo "User created."
 EOS
 chmod +x /usr/local/bin/newuser
 
+
 # --- rmuser ---
 cat > /usr/local/bin/rmuser <<'EOS'
 #!/bin/bash
 cfg="/usr/local/etc/xray/config.json"
-emails=( $(jq -r '.inbounds[0].settings.clients[].email' "$cfg") )
+mapfile -t emails < <(jq -r '.inbounds[0].settings.clients[].email' "$cfg")
 [[ ${#emails[@]} -eq 0 ]] && { echo "No users to delete."; exit 0; }
+
 for i in "${!emails[@]}"; do printf "%2d) %s\n" $((i+1)) "${emails[$i]}"; done
 read -rp "Choose user to delete: " idx
 (( idx>=1 && idx<=${#emails[@]} )) || { echo "Invalid choice"; exit 1; }
+
 email="${emails[$((idx-1))]}"
 tmp=$(mktemp)
-jq --arg e "$email" '(.inbounds[0].settings.clients) |= map(select(.email!=$e))' "$cfg" > "$tmp" && mv "$tmp" "$cfg"
+jq --arg e "$email" '(.inbounds[0].settings.clients) |= map(select(.email != $e))' \
+   "$cfg" > "$tmp" && mv "$tmp" "$cfg"
 systemctl restart xray
-echo "User $email deleted."
+echo "User \"$email\" deleted."
 EOS
 chmod +x /usr/local/bin/rmuser
+
 
 # --- sharelink ---
 cat > /usr/local/bin/sharelink <<'EOS'
@@ -205,8 +212,8 @@ cat > /usr/local/bin/sharelink <<'EOS'
 cfg="/usr/local/etc/xray/config.json"
 keys="/usr/local/etc/xray/.keys"
 
+mapfile -t emails < <(jq -r '.inbounds[0].settings.clients[].email' "$cfg")
 choose_email() {
-  emails=( $(jq -r '.inbounds[0].settings.clients[].email' "$cfg") )
   [[ -n $1 ]] && { for e in "${emails[@]}"; do [[ $e == "$1" ]] && { echo "$e"; return; }; done; }
   for i in "${!emails[@]}"; do printf "%2d) %s\n" $((i+1)) "${emails[$i]}"; done
   read -rp "Choose user: " idx
@@ -217,18 +224,19 @@ choose_email() {
 email=$(choose_email "$1")
 uuid=$(jq -r --arg e "$email" '.inbounds[0].settings.clients[]|select(.email==$e).id' "$cfg")
 proto=$(jq -r '.inbounds[0].protocol' "$cfg")
-port=$(jq -r '.inbounds[0].port' "$cfg")
+port=$(jq -r '.inbounds[0].port'      "$cfg")
 pbk=$(awk -F': ' '/Public key/ {print $2}' "$keys")
-sid=$(awk -F': ' '/shortsid/ {print $2}' "$keys")
+sid=$(awk -F': ' '/shortsid/  {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
-ip=$(curl -4 -s icanhazip.com)
+ip=$(curl -4 -s ifconfig.me)
 
 link="$proto://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#$email"
-echo -e "\nConnection link for $email:\n$link\n"
+printf "\nConnection link for %s:\n%s\n\n" "$email" "$link"
 echo "QR code:"
 echo "$link" | qrencode -t ansiutf8
 EOS
 chmod +x /usr/local/bin/sharelink
+
 
 ### 8.  OPTIONAL: create ~/help cheat-sheet ####################################
 cat > "$HOME/help" <<'EOF'
