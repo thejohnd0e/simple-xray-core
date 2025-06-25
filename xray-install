@@ -221,7 +221,7 @@ port=$(jq -r '.inbounds[0].port' "$cfg")
 pbk=$(awk -F': ' '/Public key/ {print $2}' "$keys")
 sid=$(awk -F': ' '/shortsid/ {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
-ip=$(curl -s icanhazip.com)
+ip=$(curl -4 -s icanhazip.com)
 
 link="$proto://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#$email"
 echo -e "\nConnection link for $email:\n$link\n"
