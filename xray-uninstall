@@ -22,7 +22,7 @@ echo "[+] Removing helper scripts…"
 rm -f /usr/local/bin/{mainuser,userlist,newuser,rmuser,sharelink,xray-install}
 
 echo "[+] Removing help file…"
-rm -f "$HOME/help"
+rm -f "$HOME/xray-help"
 
 echo "[+] Optional: purge helper packages (comment out if you need them)…"
 apt remove --purge -y qrencode jq curl 2>/dev/null || true
