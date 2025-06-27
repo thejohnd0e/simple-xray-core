@@ -239,7 +239,7 @@ chmod +x /usr/local/bin/sharelink
 
 
 ### 8.  OPTIONAL: create ~/help cheat-sheet ####################################
-cat > "$HOME/help" <<'EOF'
+cat > "$HOME/xray-help" <<'EOF'
 Xray user-management commands:
 
     mainuser   – show main user link & QR
@@ -256,7 +256,7 @@ Restart Xray:
 
     systemctl restart xray
 EOF
-chmod 644 "$HOME/help"
+chmod 644 "$HOME/xray-help"
 
 ### 9.  Final banner ###########################################################
 echo -e "\n[✓] Installation complete. Use the following commands:\n
