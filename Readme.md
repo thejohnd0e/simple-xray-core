@@ -58,7 +58,7 @@ sharelink
 A file named `help` will be created in the user's home directory with a list of these commands. You can view it using the following command (run from the user's home directory):
 
 ```sh
-cat help
+cat xray-help
 ```
 
 ## Useful Links
