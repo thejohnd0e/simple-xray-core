@@ -2,6 +2,12 @@
 
 You are likely familiar with control panels like 3x-ui, Marzban, and others. All of these panels are merely graphical front-ends for the X-ray core, designed to simplify its management and configuration. However, the core itself can run perfectly without any panels and can be fully managed via the terminal. The main advantage of using the "bare" core is that you don’t need to bother with domain names and TLS certificates. The core can be installed and administered manually using the official documentation. This script is intended to simplify that process: it automatically installs the core on the server, creates configuration files, and sets up several executable files for easy user management.
 
+## Related Projects
+
+- [VLESS-to-HTTP](https://github.com/thejohnd0e/VLESS-to-HTTP) — a lightweight Dockerized **HTTP proxy** that forwards traffic through a **VLESS + Reality** server.  
+  Ideal for converting VLESS traffic into a local HTTP proxy for applications that do not support VLESS directly.
+
+
 ## System Requirements
 
 * 1 CPU
