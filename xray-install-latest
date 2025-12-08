@@ -25,7 +25,10 @@ fi
 
 ### 2.  Install Xray ##########################################################
 
-XRAY_VERSION="v25.12.8"
+XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+    | grep '"tag_name":' \
+    | head -n 1 \
+    | sed -E 's/.*"([^"]+)".*/\1/')
 
 XRAY_ZIP="Xray-linux-64.zip"
 INSTALL_DIR="/usr/local/bin"
