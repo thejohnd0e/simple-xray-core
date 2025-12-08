@@ -23,8 +23,13 @@ else
     sysctl -p
 fi
 
-### 2.  Install Xray (fixed version, no API) ##################################
-XRAY_VERSION="v25.6.8"
+### 2.  Install Xray (latest version) ##################################
+
+XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+    | grep '"tag_name":' \
+    | head -n 1 \
+    | sed -E 's/.*"([^"]+)".*/\1/')
+
 XRAY_ZIP="Xray-linux-64.zip"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/usr/local/etc/xray"
