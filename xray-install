@@ -24,7 +24,7 @@ else
 fi
 
 ### 2.  Install Xray (fixed version, no API) ##################################
-XRAY_VERSION="v25.12.2"
+XRAY_VERSION="v25.6.8"
 XRAY_ZIP="Xray-linux-64.zip"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/usr/local/etc/xray"
