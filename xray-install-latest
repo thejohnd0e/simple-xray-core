@@ -23,7 +23,7 @@ else
     sysctl -p
 fi
 
-### 2.  Install Xray (latest version) ##################################
+### 2.  Install Xray ##########################################################
 
 XRAY_VERSION="v25.12.8"
 
@@ -59,9 +59,11 @@ UUID=$("$INSTALL_DIR/xray" uuid)
   echo "shortsid: $(openssl rand -hex 8)"
 } > "$KEYFILE"
 
-PRIV_KEY=$(awk -F': ' '/Private key/ {print $2}' "$KEYFILE")
-PUB_KEY=$(awk  -F': ' '/Public key/  {print $2}' "$KEYFILE")
-SHORT_ID=$(awk -F': ' '/shortsid/   {print $2}' "$KEYFILE")
+# Поддержка как старого, так и нового формата вывода xray x25519
+PRIV_KEY=$(awk -F': ' '/Private[Kk]ey/ {print $2}' "$KEYFILE")
+# В новых версиях "Public key" стал "Password"
+PUB_KEY=$(awk -F': ' '/Public key|Password/ {print $2}' "$KEYFILE" | head -n1)
+SHORT_ID=$(awk -F': ' '/shortsid/ {print $2}' "$KEYFILE")
 
 ### 5.  Write config.json (VLESS + Reality) ####################################
 cat > "$CONFIG_DIR/config.json" <<EOF
@@ -84,8 +86,7 @@ cat > "$CONFIG_DIR/config.json" <<EOF
           { 
             "id": "$UUID", 
             "email": "main", 
-            "flow": "xtls-rprx-vision",
-            "encryption": "none"
+            "flow": "xtls-rprx-vision"
           }
         ],
         "decryption": "none"
@@ -144,11 +145,12 @@ keys="/usr/local/etc/xray/.keys"
 
 proto=$(jq -r '.inbounds[0].protocol' "$cfg")
 port=$(jq -r '.inbounds[0].port'      "$cfg")
-uuid=$(awk  -F': ' '/uuid/        {print $2}' "$keys")
-pbk=$(awk   -F': ' '/Public key/  {print $2}' "$keys")
-sid=$(awk   -F': ' '/shortsid/    {print $2}' "$keys")
+uuid=$(awk  -F': ' '/uuid/ {print $2}' "$keys")
+# Поддержка обоих форматов: "Public key" и "Password"
+pbk=$(awk -F': ' '/Public key|Password/ {print $2}' "$keys" | head -n1)
+sid=$(awk -F': ' '/shortsid/ {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
-ip=$(curl -4 -s ifconfig.me)                # ← только IPv4
+ip=$(curl -4 -s ifconfig.me)
 
 link="$proto://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#vless-$ip"
 printf "\nConnection link:\n%s\n\n" "$link"
@@ -183,7 +185,7 @@ fi
 uuid=$(xray uuid)
 tmp=$(mktemp)
 jq --arg e "$email" --arg u "$uuid" \
-   '.inbounds[0].settings.clients += [{"email":$e,"id":$u,"flow":"xtls-rprx-vision","encryption":"none"}]' \
+   '.inbounds[0].settings.clients += [{"email":$e,"id":$u,"flow":"xtls-rprx-vision"}]' \
    "$cfg" > "$tmp" && mv "$tmp" "$cfg"
 systemctl restart xray
 echo "User created."
@@ -232,8 +234,9 @@ email=$(choose_email "$1")
 uuid=$(jq -r --arg e "$email" '.inbounds[0].settings.clients[]|select(.email==$e).id' "$cfg")
 proto=$(jq -r '.inbounds[0].protocol' "$cfg")
 port=$(jq -r '.inbounds[0].port'      "$cfg")
-pbk=$(awk -F': ' '/Public key/ {print $2}' "$keys")
-sid=$(awk -F': ' '/shortsid/  {print $2}' "$keys")
+# Поддержка обоих форматов: "Public key" и "Password"
+pbk=$(awk -F': ' '/Public key|Password/ {print $2}' "$keys" | head -n1)
+sid=$(awk -F': ' '/shortsid/ {print $2}' "$keys")
 sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
 ip=$(curl -4 -s ifconfig.me)
 
