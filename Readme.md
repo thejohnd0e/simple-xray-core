@@ -22,6 +22,11 @@ To download and run the X-ray, use the following command:
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install | bash
 ```
+To update to the latest version and run the X-ray, use the following command:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash
+```
 
 To uninstall the X-ray, use the following command:
 
