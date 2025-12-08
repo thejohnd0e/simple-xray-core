@@ -13,7 +13,7 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 * 1 CPU
 * 512 Mb RAM
 * 5 Gb disk space
-* OS: Tested on Debian 12 x64
+* OS: Ubuntu/Debian x64
 
 ## How to Use the Script
 
