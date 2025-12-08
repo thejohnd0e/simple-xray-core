@@ -261,7 +261,7 @@ EOF
 chmod 644 "$HOME/xray-help"
 
 ### 9.  Final banner ###########################################################
-echo -e "\n[✓] Installation complete. Use the following commands:\n
+echo -e "\n[✓] Installation ver. ${XRAY_VERSION} complete. Use the following commands:\n
   mainuser   - show main user link & QR
   userlist   - list users
   newuser    - add user
