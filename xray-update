@@ -1,9 +1,32 @@
 #!/bin/bash
-LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep tag_name | cut -d '"' -f4)
-CURRENT=$(xray -version | awk '{print $2}')
-if [ "$LATEST" != "$CURRENT" ]; then
+
+# Get latest release version (without leading v)
+LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+    | grep tag_name | cut -d '"' -f4 | sed 's/^v//')
+
+# Get currently installed version (without leading v)
+CURRENT=$(/usr/local/bin/xray -version 2>/dev/null \
+    | head -n1 | awk '{print $2}' | sed 's/^v//')
+
+echo "Current version: $CURRENT"
+echo "Latest version:  $LATEST"
+
+# Determine if update is needed
+if [ -z "$CURRENT" ]; then
+    echo "Xray is not installed. Installing $LATEST..."
+    NEED_UPDATE=1
+elif [ "$LATEST" != "$CURRENT" ]; then
+    echo "Update required."
+    NEED_UPDATE=1
+else
+    echo "Already up to date."
+    NEED_UPDATE=0
+fi
+
+# Perform update if needed
+if [ $NEED_UPDATE -eq 1 ]; then
     systemctl stop xray
-    wget https://github.com/XTLS/Xray-core/releases/download/$LATEST/Xray-linux-64.zip -O /tmp/xray.zip
+    wget https://github.com/XTLS/Xray-core/releases/download/v$LATEST/Xray-linux-64.zip -O /tmp/xray.zip
     unzip -o /tmp/xray.zip xray -d /usr/local/bin
     chmod +x /usr/local/bin/xray
     systemctl start xray
