@@ -11,7 +11,7 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 ## System Requirements
 
 * 1 CPU
-* 512 Mb RAM
+* 256 Mb RAM
 * 5 Gb disk space
 * OS: Ubuntu/Debian x64
 
