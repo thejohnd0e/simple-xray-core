@@ -17,10 +17,10 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 
 ## How to Use the Script
 
-To install and run the X-ray, use the following command:
+To install and run the X-ray latest version, use the following command:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install | bash
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install-latest | bash
 ```
 To update to the latest version and run the X-ray, use the following command:
 
