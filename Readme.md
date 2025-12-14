@@ -113,7 +113,7 @@ cat xray-help
 * [v2rayA](https://github.com/v2rayA/v2rayA)
 * [Furious](https://github.com/LorenEteval/Furious)
 
-* **OpenWRT routers**
+**OpenWRT routers**
 
 * [PassWall](https://github.com/xiaorouji/openwrt-passwall)
 * [PassWall 2](https://github.com/xiaorouji/openwrt-passwall2)
