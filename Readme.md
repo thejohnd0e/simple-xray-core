@@ -100,6 +100,7 @@ cat xray-help
 * [OneXray](https://github.com/OneXray/OneXray)
 
 **macOS arm64 & x64**
+
 * [TThrone (Formerly Nekoray)](https://github.com/throneproj/Throne)
 * [V2rayU](https://github.com/yanue/V2rayU)
 * [V2RayXS](https://github.com/tzmax/V2RayXS)
@@ -111,3 +112,11 @@ cat xray-help
 * [Nekoray](https://github.com/MatsuriDayo/nekoray)
 * [v2rayA](https://github.com/v2rayA/v2rayA)
 * [Furious](https://github.com/LorenEteval/Furious)
+
+* **OpenWRT routers**
+
+* [PassWall](https://github.com/xiaorouji/openwrt-passwall)
+* [PassWall 2](https://github.com/xiaorouji/openwrt-passwall2)
+* [luci-app-xray](https://github.com/yichya/luci-app-xray)
+* [v2rayA](https://github.com/v2rayA/v2rayA)
+* [ShadowSocksR Plus+](https://github.com/fw876/helloworld)
