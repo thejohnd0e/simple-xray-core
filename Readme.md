@@ -22,10 +22,17 @@ To install and run the X-ray latest version, use the following command:
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install-latest | bash
 ```
+**********************************************************************************
+
 To update to the latest version and run the X-ray, use the following command:
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash
+```
+
+To Ssetting up auto-update in cron:
+```sh
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash -s -- --install-cron
 ```
 
 To uninstall the X-ray, use the following command:
