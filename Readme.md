@@ -102,7 +102,7 @@ cat xray-help
 
 **macOS arm64 & x64**
 
-* [TThrone (Formerly Nekoray)](https://github.com/throneproj/Throne)
+* [Throne (Formerly Nekoray)](https://github.com/throneproj/Throne)
 * [V2rayU](https://github.com/yanue/V2rayU)
 * [V2RayXS](https://github.com/tzmax/V2RayXS)
 * [Furious](https://github.com/LorenEteval/Furious)
