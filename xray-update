@@ -1,5 +1,28 @@
 #!/bin/bash
 
+# Function to install cron job
+install_cron() {
+    SCRIPT_URL="https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update"
+    CRON_JOB="0 3 * * * wget -qO- $SCRIPT_URL | bash >> /var/log/xray-update.log 2>&1"
+    
+    # Check if cron job already exists
+    if crontab -l 2>/dev/null | grep -q "$SCRIPT_URL"; then
+        echo "Cron job already installed."
+        return 0
+    fi
+    
+    # Add cron job
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    echo "Cron job installed. Will check for updates daily at 3 AM."
+    echo "Logs: /var/log/xray-update.log"
+}
+
+# Check for --install-cron flag
+if [ "$1" == "--install-cron" ]; then
+    install_cron
+    exit 0
+fi
+
 # Get latest release version (without leading v)
 LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest \
     | grep tag_name | cut -d '"' -f4 | sed 's/^v//')
@@ -29,6 +52,7 @@ if [ $NEED_UPDATE -eq 1 ]; then
     wget https://github.com/XTLS/Xray-core/releases/download/v$LATEST/Xray-linux-64.zip -O /tmp/xray.zip
     unzip -o /tmp/xray.zip xray -d /usr/local/bin
     chmod +x /usr/local/bin/xray
+    rm -f /tmp/xray.zip
     systemctl start xray
     echo "Updated to $LATEST"
 fi
