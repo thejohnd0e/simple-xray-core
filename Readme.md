@@ -30,7 +30,7 @@ To update to the latest version and run the X-ray, use the following command:
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash
 ```
 
-To Ssetting up auto-update in cron:
+To set up auto-update in cron:
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash -s -- --install-cron
 ```
