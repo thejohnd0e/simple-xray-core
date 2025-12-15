@@ -81,6 +81,7 @@ cat xray-help
 
 **Windows**
 
+* [Throne (Formerly Nekoray)](https://github.com/throneproj/Throne)
 * [Nekoray](https://github.com/MatsuriDayo/nekoray)
 * [v2rayN](https://github.com/2dust/v2rayN)
 * [Furious](https://github.com/LorenEteval/Furious)
@@ -109,6 +110,7 @@ cat xray-help
 
 **Linux**
 
+* [Throne (Formerly Nekoray)](https://github.com/throneproj/Throne)
 * [Nekoray](https://github.com/MatsuriDayo/nekoray)
 * [v2rayA](https://github.com/v2rayA/v2rayA)
 * [Furious](https://github.com/LorenEteval/Furious)
