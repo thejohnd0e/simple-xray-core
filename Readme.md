@@ -22,7 +22,7 @@ To install and run the X-ray latest version, use the following command:
 ```sh
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install-latest | bash
 ```
-<span style="color:red">This command alone is enough to start working</span>
+> **This command is enough to get started**
 
 
 **********************************************************************************
