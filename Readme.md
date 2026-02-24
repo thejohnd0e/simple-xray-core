@@ -1,3 +1,7 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Shell](https://img.shields.io/badge/Shell-Bash-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
+
+
 # One click installation and configuration of X-ray Core Without GUI
 
 You are likely familiar with control panels like 3x-ui, Marzban, and others. All of these panels are merely graphical front-ends for the X-ray core, designed to simplify its management and configuration. However, the core itself can run perfectly without any panels and can be fully managed via the terminal. The main advantage of using the "bare" core is that you don’t need to bother with domain names and TLS certificates. The core can be installed and administered manually using the official documentation. This script is intended to simplify that process: it automatically installs the core on the server, creates configuration files, and sets up several executable files for easy user management.
