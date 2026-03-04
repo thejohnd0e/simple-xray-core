@@ -9,7 +9,7 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 
 ## Related Projects
 
-- [VLESS-to-HTTP](https://github.com/thejohnd0e/VLESS-to-HTTP) — a lightweight Dockerized **HTTP proxy** that forwards traffic through a **VLESS + Reality** server.  
+- [VLESS-to-HTTP](https://github.com/thejohnd0e/VLESS-to-HTTP) — a lightweight Dockerized **HTTP/SOCKS5 proxy** that forwards traffic through a **VLESS + Reality** server.  
   Ideal for converting VLESS traffic into a local HTTP proxy for applications that do not support VLESS directly.
 
 
