@@ -30,7 +30,11 @@ To install and run the X-ray latest version, use the following command:
 wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install-latest | bash
 ```
 
+The installer verifies the Xray archive against the official SHA-256 digest before installation. If a complete existing configuration and key set are found, the installer preserves the configuration, keys, and all existing users.
+
 **********************************************************************************
+
+`xray-update` only updates an existing complete Xray installation. It verifies the downloaded archive against the official SHA-256 digest and automatically restores the previous binary if the updated service fails to start.
 
 To update to the latest version and run the X-ray, use the following command:
 
@@ -81,7 +85,7 @@ rmuser
 sharelink
 ```
 
-A file named `help` will be created in the user's home directory with a list of these commands. You can view it using the following command (run from the user's home directory):
+A file named xray-help will be created in the user's home directory. It contains a list of these commands and can be viewed using the following command (run from the user's home directory):
 
 ```sh
 cat xray-help
