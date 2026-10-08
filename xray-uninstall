@@ -17,7 +17,7 @@ systemctl disable xray.service 2>/dev/null || true
 
 echo "[+] Removing the project cron entry and update log"
 if command -v crontab >/dev/null 2>&1; then
-    cron_job='0 3 * * * wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash >> /var/log/xray-update.log 2>&1'
+    cron_job='0 3 * * * wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/tested/xray-update | bash >> /var/log/xray-update.log 2>&1'
     current_cron=$(crontab -l 2>/dev/null || true)
     filtered_cron=$(printf '%s\n' "$current_cron" | awk -v job="$cron_job" '$0 != job')
     if [[ $filtered_cron != "$current_cron" ]]; then

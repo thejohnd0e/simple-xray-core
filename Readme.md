@@ -27,7 +27,7 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 To install and run the X-ray latest version, use the following command:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-install-latest | bash
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/tested/xray-install-latest | bash
 ```
 
 The installer verifies the Xray archive against the official SHA-256 digest before installation. If a complete existing configuration and key set are found, the installer preserves the configuration, keys, and all existing users.
@@ -39,18 +39,18 @@ The installer verifies the Xray archive against the official SHA-256 digest befo
 To update to the latest version and run the X-ray, use the following command:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/tested/xray-update | bash
 ```
 
 To set up auto-update in cron:
 ```sh
-wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash -s -- --install-cron
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/tested/xray-update | bash -s -- --install-cron
 ```
 
 To uninstall the X-ray, use the following command:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-uninstall | bash
+wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/tested/xray-uninstall | bash
 ```
 
 ## User Management Commands

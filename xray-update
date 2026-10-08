@@ -28,7 +28,7 @@ preflight() {
 
 install_cron() {
     local script_url cron_job current
-    script_url="https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update"
+    script_url="https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/tested/xray-update"
     cron_job="0 3 * * * wget -qO- $script_url | bash >> /var/log/xray-update.log 2>&1"
     current=$(crontab -l 2>/dev/null || true)
     if grep -Fq "$script_url" <<< "$current"; then
