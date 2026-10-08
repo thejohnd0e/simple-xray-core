@@ -1,31 +1,57 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
-echo "[+] Stopping xray.service (if running)…"
-systemctl stop    xray.service 2>/dev/null || true
+die() { echo "Error: $*" >&2; exit 1; }
+
+[[ $EUID -eq 0 ]] || die "run this uninstaller as root"
+[[ -r /etc/os-release ]] || die "cannot identify the operating system"
+. /etc/os-release
+[[ ${ID:-} == "debian" || ${ID:-} == "ubuntu" ]] || die "only Debian and Ubuntu are supported"
+[[ $(uname -m) == "x86_64" ]] || die "only x86_64 is supported"
+command -v systemctl >/dev/null 2>&1 || die "systemd is required"
+[[ -d /run/systemd/system ]] || die "systemd is not running"
+
+echo "[+] Stopping xray.service if running"
+systemctl stop xray.service 2>/dev/null || true
 systemctl disable xray.service 2>/dev/null || true
 
-echo "[+] Removing Xray binary & geo-files in /usr/local/bin…"
+echo "[+] Removing the project cron entry and update log"
+if command -v crontab >/dev/null 2>&1; then
+    cron_job='0 3 * * * wget -qO- https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update | bash >> /var/log/xray-update.log 2>&1'
+    current_cron=$(crontab -l 2>/dev/null || true)
+    filtered_cron=$(printf '%s\n' "$current_cron" | awk -v job="$cron_job" '$0 != job')
+    if [[ $filtered_cron != "$current_cron" ]]; then
+        if [[ -n $filtered_cron ]]; then
+            printf '%s\n' "$filtered_cron" | crontab -
+        else
+            crontab -r 2>/dev/null || true
+        fi
+    fi
+fi
+rm -f /var/log/xray-update.log
+
+if [[ -f /etc/sysctl.d/99-simple-xray-bbr.conf ]]; then
+    rm -f /etc/sysctl.d/99-simple-xray-bbr.conf
+    sysctl --system >/dev/null || true
+fi
+
+echo "[+] Removing Xray files"
 rm -f /usr/local/bin/xray \
+      /usr/local/bin/xray.new \
+      /usr/local/bin/xray.backup \
       /usr/local/bin/geosite.dat \
       /usr/local/bin/geoip.dat
+rm -rf /usr/local/etc/xray /usr/local/share/xray
 
-echo "[+] Removing config, keys and share-data…"
-rm -rf /usr/local/etc/xray          # config + .keys
-rm -rf /usr/local/share/xray        # geosite/geoip master copies
-
-echo "[+] Removing systemd unit…"
 rm -f /etc/systemd/system/xray.service
 systemctl daemon-reload
 
-echo "[+] Removing helper scripts…"
-rm -f /usr/local/bin/{mainuser,userlist,newuser,rmuser,sharelink,xray-install}
-
-echo "[+] Removing help file…"
+rm -f /usr/local/bin/mainuser \
+      /usr/local/bin/userlist \
+      /usr/local/bin/newuser \
+      /usr/local/bin/rmuser \
+      /usr/local/bin/sharelink \
+      /usr/local/bin/xray-install
 rm -f "$HOME/xray-help"
 
-echo "[+] Optional: purge helper packages (comment out if you need them)…"
-apt remove --purge -y qrencode jq curl 2>/dev/null || true
-apt autoremove      -y                           2>/dev/null || true
-
-echo "[✓] Xray and all related files removed."
+echo "[+] Xray and project-owned files removed. Shared packages were preserved."

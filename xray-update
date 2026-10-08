@@ -1,58 +1,107 @@
 #!/bin/bash
+set -Eeuo pipefail
+umask 077
 
-# Function to install cron job
-install_cron() {
-    SCRIPT_URL="https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update"
-    CRON_JOB="0 3 * * * wget -qO- $SCRIPT_URL | bash >> /var/log/xray-update.log 2>&1"
-    
-    # Check if cron job already exists
-    if crontab -l 2>/dev/null | grep -q "$SCRIPT_URL"; then
-        echo "Cron job already installed."
-        return 0
+XRAY_BIN="/usr/local/bin/xray"
+CONFIG_FILE="/usr/local/etc/xray/config.json"
+SERVICE_FILE="/etc/systemd/system/xray.service"
+XRAY_ZIP="Xray-linux-64.zip"
+TEMP_DIR=""
+
+cleanup() {
+    if [[ -n ${TEMP_DIR:-} ]]; then
+        rm -rf -- "$TEMP_DIR"
     fi
-    
-    # Add cron job
-    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+}
+trap cleanup EXIT
+die() { echo "Error: $*" >&2; exit 1; }
+
+preflight() {
+    [[ $EUID -eq 0 ]] || die "run this updater as root"
+    [[ -r /etc/os-release ]] || die "cannot identify the operating system"
+    . /etc/os-release
+    [[ ${ID:-} == "debian" || ${ID:-} == "ubuntu" ]] || die "only Debian and Ubuntu are supported"
+    [[ $(uname -m) == "x86_64" ]] || die "only x86_64 is supported"
+    command -v systemctl >/dev/null 2>&1 || die "systemd is required"
+    [[ -d /run/systemd/system ]] || die "systemd is not running"
+}
+
+install_cron() {
+    local script_url cron_job current
+    script_url="https://raw.githubusercontent.com/thejohnd0e/simple-xray-core/refs/heads/main/xray-update"
+    cron_job="0 3 * * * wget -qO- $script_url | bash >> /var/log/xray-update.log 2>&1"
+    current=$(crontab -l 2>/dev/null || true)
+    if grep -Fq "$script_url" <<< "$current"; then
+        echo "Cron job already installed."
+        return
+    fi
+    { [[ -n $current ]] && printf '%s\n' "$current"; printf '%s\n' "$cron_job"; } | crontab -
     echo "Cron job installed. Will check for updates daily at 3 AM."
     echo "Logs: /var/log/xray-update.log"
 }
 
-# Check for --install-cron flag
-if [ "$1" == "--install-cron" ]; then
+preflight
+[[ -x $XRAY_BIN && -f $CONFIG_FILE && -f $SERVICE_FILE ]] || {
+    echo "Xray is not installed completely. Run xray-install or xray-install-latest first." >&2
+    exit 1
+}
+
+if [[ ${1:-} == "--install-cron" ]]; then
     install_cron
     exit 0
 fi
 
-# Get latest release version (without leading v)
-LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest \
-    | grep tag_name | cut -d '"' -f4 | sed 's/^v//')
+for command in curl wget unzip sha256sum flock; do
+    command -v "$command" >/dev/null 2>&1 || die "$command is required"
+done
 
-# Get currently installed version (without leading v)
-CURRENT=$(/usr/local/bin/xray -version 2>/dev/null \
-    | head -n1 | awk '{print $2}' | sed 's/^v//')
+exec 9>/run/lock/simple-xray-update.lock
+flock -n 9 || die "another Xray update is already running"
+
+LATEST=$(curl --fail --silent --show-error --max-time 20 \
+    https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+    | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/p')
+[[ $LATEST =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "invalid latest Xray version: $LATEST"
+CURRENT=$("$XRAY_BIN" -version | awk 'NR == 1 {sub(/^v/, "", $2); print $2}')
+[[ $CURRENT =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "cannot determine the installed Xray version"
 
 echo "Current version: $CURRENT"
 echo "Latest version:  $LATEST"
-
-# Determine if update is needed
-if [ -z "$CURRENT" ]; then
-    echo "Xray is not installed. Installing $LATEST..."
-    NEED_UPDATE=1
-elif [ "$LATEST" != "$CURRENT" ]; then
-    echo "Update required."
-    NEED_UPDATE=1
-else
+if [[ $LATEST == "$CURRENT" ]]; then
     echo "Already up to date."
-    NEED_UPDATE=0
+    exit 0
 fi
 
-# Perform update if needed
-if [ $NEED_UPDATE -eq 1 ]; then
-    systemctl stop xray
-    wget https://github.com/XTLS/Xray-core/releases/download/v$LATEST/Xray-linux-64.zip -O /tmp/xray.zip
-    unzip -o /tmp/xray.zip xray -d /usr/local/bin
-    chmod +x /usr/local/bin/xray
-    rm -f /tmp/xray.zip
-    systemctl start xray
-    echo "Updated to $LATEST"
+TEMP_DIR=$(mktemp -d)
+archive="$TEMP_DIR/$XRAY_ZIP"
+digest="$archive.dgst"
+base_url="https://github.com/XTLS/Xray-core/releases/download/v$LATEST"
+wget -q --https-only "$base_url/$XRAY_ZIP" -O "$archive"
+wget -q --https-only "$base_url/$XRAY_ZIP.dgst" -O "$digest"
+expected=$(awk -F= '/^[[:space:]]*SHA2-256[[:space:]]*=/ {hash=$2; gsub(/[[:space:]]/, "", hash); print hash; exit}' "$digest")
+[[ $expected =~ ^[0-9a-fA-F]{64}$ ]] || die "release checksum is missing or invalid"
+printf '%s  %s\n' "$expected" "$archive" | sha256sum -c - >/dev/null
+unzip -q "$archive" xray -d "$TEMP_DIR"
+chmod 0755 "$TEMP_DIR/xray"
+"$TEMP_DIR/xray" run -test -config "$CONFIG_FILE" >/dev/null
+
+install -m 0755 "$TEMP_DIR/xray" /usr/local/bin/xray.new
+cp -p "$XRAY_BIN" /usr/local/bin/xray.backup
+mv -f /usr/local/bin/xray.new "$XRAY_BIN"
+
+if ! systemctl restart xray || ! systemctl is-active --quiet xray; then
+    if ! install -m 0755 /usr/local/bin/xray.backup /usr/local/bin/xray.restore \
+        || ! mv -f /usr/local/bin/xray.restore "$XRAY_BIN"; then
+        echo "Critical: failed to restore $XRAY_BIN; backup remains at /usr/local/bin/xray.backup" >&2
+        exit 1
+    fi
+    if ! systemctl restart xray || ! systemctl is-active --quiet xray; then
+        echo "Critical: previous Xray binary was restored but the service did not start." >&2
+        exit 1
+    fi
+    echo "Previous Xray binary restored after the new version failed to start." >&2
+    exit 1
 fi
+
+rm -f /usr/local/bin/xray.backup
+echo "Updated to $LATEST"

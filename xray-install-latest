@@ -1,75 +1,128 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
+umask 077
 
-# --- check wget ---
-if ! command -v wget >/dev/null 2>&1; then
-    echo "[+] wget not found — installing..."
-    apt update && apt install -y wget
-fi
+XRAY_ZIP="Xray-linux-64.zip"
+INSTALL_DIR="/usr/local/bin"
+CONFIG_DIR="/usr/local/etc/xray"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+KEYFILE="$CONFIG_DIR/.keys"
+DAT_DIR="/usr/local/share/xray"
+SERVICE_FILE="/etc/systemd/system/xray.service"
+BBR_CONFIG="/etc/sysctl.d/99-simple-xray-bbr.conf"
+TEMP_DIR=""
+XRAY_BACKUP=""
 
-### 0.  Basic packages #########################################################
+cleanup() {
+    local status=$?
+    if ((status != 0)) && [[ -n ${XRAY_BACKUP:-} && -f $XRAY_BACKUP ]]; then
+        if install -m 0755 "$XRAY_BACKUP" "$INSTALL_DIR/xray.restore" \
+            && mv -f "$INSTALL_DIR/xray.restore" "$INSTALL_DIR/xray"; then
+            systemctl restart xray 2>/dev/null || true
+            echo "Previous Xray binary restored after installer failure." >&2
+        else
+            echo "Critical: failed to restore the previous Xray binary from $XRAY_BACKUP" >&2
+        fi
+    fi
+    if [[ -n ${TEMP_DIR:-} ]]; then
+        rm -rf -- "$TEMP_DIR"
+    fi
+    return "$status"
+}
+trap cleanup EXIT
+die() { echo "Error: $*" >&2; exit 1; }
+
+preflight() {
+    [[ $EUID -eq 0 ]] || die "run this installer as root"
+    [[ -r /etc/os-release ]] || die "cannot identify the operating system"
+    . /etc/os-release
+    [[ ${ID:-} == "debian" || ${ID:-} == "ubuntu" ]] || die "only Debian and Ubuntu are supported"
+    [[ $(uname -m) == "x86_64" ]] || die "only x86_64 is supported"
+    command -v systemctl >/dev/null 2>&1 || die "systemd is required"
+    [[ -d /run/systemd/system ]] || die "systemd is not running"
+    command -v wget >/dev/null 2>&1 || die "wget is required to start the installer"
+    command -v ss >/dev/null 2>&1 || die "ss is required for the port check"
+
+    if [[ -e $CONFIG_FILE || -e $KEYFILE ]]; then
+        [[ -f $CONFIG_FILE && -f $KEYFILE ]] || die "incomplete existing installation; both $CONFIG_FILE and $KEYFILE are required"
+        PRESERVE_CONFIG=1
+    else
+        PRESERVE_CONFIG=0
+        if ss -H -ltn | awk '{print $4}' | grep -E ':443$' >/dev/null; then
+            die "port 443 is already in use"
+        fi
+    fi
+}
+
+preflight
+XRAY_VERSION=$(wget -qO- --https-only https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+    | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
+[[ $XRAY_VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "invalid latest Xray version: $XRAY_VERSION"
+
 apt update
-apt install -y curl jq qrencode unzip openssl
+apt install -y ca-certificates curl jq qrencode unzip openssl coreutils
 
 ### 1.  Enable BBR if not already #############################################
 if sysctl -n net.ipv4.tcp_congestion_control | grep -q bbr; then
     echo "[+] BBR already enabled"
 else
     echo "[+] Enabling BBR"
-    {
-      echo "net.core.default_qdisc=fq"
-      echo "net.ipv4.tcp_congestion_control=bbr"
-    } >> /etc/sysctl.conf
-    sysctl -p
+    cat > "$BBR_CONFIG" <<'EOF'
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+EOF
+    chmod 0644 "$BBR_CONFIG"
+    sysctl --system
 fi
 
-### 2.  Install Xray ##########################################################
-
-XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest \
-    | grep '"tag_name":' \
-    | head -n 1 \
-    | sed -E 's/.*"([^"]+)".*/\1/')
-
-XRAY_ZIP="Xray-linux-64.zip"
-INSTALL_DIR="/usr/local/bin"
-CONFIG_DIR="/usr/local/etc/xray"
-DAT_DIR="/usr/local/share/xray"
-
-mkdir -p "$CONFIG_DIR" "$DAT_DIR"
-cd /tmp
-echo "[+] Downloading Xray $XRAY_VERSION …"
-wget -q "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${XRAY_ZIP}" -O xray.zip
-unzip -o xray.zip xray -d "$INSTALL_DIR"
-chmod +x "$INSTALL_DIR/xray"
-rm -f xray.zip
-echo "[+] Xray installed to $INSTALL_DIR/xray"
+TEMP_DIR=$(mktemp -d)
+archive="$TEMP_DIR/$XRAY_ZIP"
+digest="$archive.dgst"
+base_url="https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION"
+echo "[+] Downloading Xray $XRAY_VERSION"
+wget -q --https-only "$base_url/$XRAY_ZIP" -O "$archive"
+wget -q --https-only "$base_url/$XRAY_ZIP.dgst" -O "$digest"
+expected=$(awk -F= '/^[[:space:]]*SHA2-256[[:space:]]*=/ {hash=$2; gsub(/[[:space:]]/, "", hash); print hash; exit}' "$digest")
+[[ $expected =~ ^[0-9a-fA-F]{64}$ ]] || die "release checksum is missing or invalid"
+printf '%s  %s\n' "$expected" "$archive" | sha256sum -c - >/dev/null
+unzip -q "$archive" xray -d "$TEMP_DIR"
+chmod 0755 "$TEMP_DIR/xray"
+if [[ $PRESERVE_CONFIG -eq 1 ]]; then
+    "$TEMP_DIR/xray" run -test -config "$CONFIG_FILE" >/dev/null
+fi
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DAT_DIR"
+chmod 700 "$CONFIG_DIR"
+if [[ -x $INSTALL_DIR/xray ]]; then
+    XRAY_BACKUP="$TEMP_DIR/xray.backup"
+    cp -p "$INSTALL_DIR/xray" "$XRAY_BACKUP"
+fi
+install -m 0755 "$TEMP_DIR/xray" "$INSTALL_DIR/xray.new"
+mv -f "$INSTALL_DIR/xray.new" "$INSTALL_DIR/xray"
 
 ### 3.  Download geosite / geoip ##############################################
-echo "[+] Downloading geosite / geoip …"
-curl -Lo "$DAT_DIR/geosite.dat" \
+echo "[+] Downloading geosite and geoip"
+curl --fail --location --silent --show-error -o "$DAT_DIR/geosite.dat" \
      https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-curl -Lo "$DAT_DIR/geoip.dat" \
+curl --fail --location --silent --show-error -o "$DAT_DIR/geoip.dat" \
      https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-# продублируем рядом с бинарником — Xray ищет сначала там
 cp "$DAT_DIR"/*.dat "$INSTALL_DIR/"
 
 ### 4.  Generate keys & UUID ###################################################
-KEYFILE="$CONFIG_DIR/.keys"
-UUID=$("$INSTALL_DIR/xray" uuid)
-{
-  echo "uuid: $UUID"
-  "$INSTALL_DIR/xray" x25519
-  echo "shortsid: $(openssl rand -hex 8)"
-} > "$KEYFILE"
-
-# Поддержка как старого, так и нового формата вывода xray x25519
-PRIV_KEY=$(awk -F': ' '/Private[Kk]ey/ {print $2}' "$KEYFILE")
-# В новых версиях "Public key" стал "Password"
-PUB_KEY=$(awk -F': ' '/Public key|Password/ {print $2}' "$KEYFILE" | head -n1)
-SHORT_ID=$(awk -F': ' '/shortsid/ {print $2}' "$KEYFILE")
+if [[ $PRESERVE_CONFIG -eq 1 ]]; then
+    echo "[+] Existing configuration and keys preserved"
+else
+    UUID=$("$INSTALL_DIR/xray" uuid)
+    {
+      echo "uuid: $UUID"
+      "$INSTALL_DIR/xray" x25519
+      echo "shortsid: $(openssl rand -hex 8)"
+    } > "$KEYFILE"
+    PRIV_KEY=$(awk -F': ' '/Private[Kk]ey/ {print $2}' "$KEYFILE")
+    SHORT_ID=$(awk -F': ' '/shortsid/ {print $2}' "$KEYFILE")
+    [[ -n $PRIV_KEY && -n $SHORT_ID ]] || die "failed to generate Reality keys"
 
 ### 5.  Write config.json (VLESS + Reality) ####################################
-cat > "$CONFIG_DIR/config.json" <<EOF
+cat > "$CONFIG_FILE" <<EOF
 {
   "log": { "loglevel": "warning" },
   "routing": {
@@ -116,17 +169,20 @@ cat > "$CONFIG_DIR/config.json" <<EOF
   "policy": { "levels": { "0": { "handshake": 3, "connIdle": 180 } } }
 }
 EOF
-echo "[+] Config written to $CONFIG_DIR/config.json"
+fi
+chmod 700 "$CONFIG_DIR"
+chmod 600 "$KEYFILE" "$CONFIG_FILE"
+"$INSTALL_DIR/xray" run -test -config "$CONFIG_FILE" >/dev/null
+echo "[+] Configuration ready at $CONFIG_FILE"
 
 ### 6.  Systemd service ########################################################
-SERVICE_FILE="/etc/systemd/system/xray.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=Xray Service
 After=network.target nss-lookup.target
 
 [Service]
-ExecStart=$INSTALL_DIR/xray run -config $CONFIG_DIR/config.json
+ExecStart=$INSTALL_DIR/xray run -config $CONFIG_FILE
 Restart=on-failure
 LimitNOFILE=1000000
 
@@ -137,129 +193,188 @@ EOF
 systemctl daemon-reload
 systemctl enable xray
 systemctl restart xray
+systemctl is-active --quiet xray || die "xray.service did not become active"
 echo "[+] Xray service started"
 
 ### 7.  Helper scripts #########################################################
 # --- mainuser ---
 cat > /usr/local/bin/mainuser <<'EOS'
 #!/bin/bash
+set -Eeuo pipefail
 cfg="/usr/local/etc/xray/config.json"
 keys="/usr/local/etc/xray/.keys"
-
-proto=$(jq -r '.inbounds[0].protocol' "$cfg")
-port=$(jq -r '.inbounds[0].port'      "$cfg")
-uuid=$(awk  -F': ' '/uuid/ {print $2}' "$keys")
-# Поддержка обоих форматов: "Public key" и "Password"
-pbk=$(awk -F': ' '/Public key|Password/ {print $2}' "$keys" | head -n1)
-sid=$(awk -F': ' '/shortsid/ {print $2}' "$keys")
-sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
-ip=$(curl -4 -s ifconfig.me)
-
+uuid=$(jq -er '.inbounds[0].settings.clients[] | select(.email == "main").id' "$cfg")
+proto=$(jq -er '.inbounds[0].protocol' "$cfg")
+port=$(jq -er '.inbounds[0].port' "$cfg")
+pbk=$(awk -F': ' '/Public key|Password/ {print $2; exit}' "$keys")
+sid=$(awk -F': ' '/shortsid/ {print $2; exit}' "$keys")
+sni=$(jq -er '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
+ip=$(curl --fail --silent --show-error --max-time 10 -4 https://ifconfig.me)
+[[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "Unable to determine public IPv4 address" >&2; exit 1; }
 link="$proto://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#vless-$ip"
-printf "\nConnection link:\n%s\n\n" "$link"
+printf '\nConnection link:\n%s\n\n' "$link"
 echo "QR code:"
-echo "$link" | qrencode -t ansiutf8
+printf '%s\n' "$link" | qrencode -t ansiutf8
 EOS
-chmod +x /usr/local/bin/mainuser
+chmod 0755 /usr/local/bin/mainuser
 
 
 # --- userlist ---
 cat > /usr/local/bin/userlist <<'EOS'
 #!/bin/bash
+set -Eeuo pipefail
 cfg="/usr/local/etc/xray/config.json"
-mapfile -t emails < <(jq -r '.inbounds[0].settings.clients[].email' "$cfg")
+emails_json=$(jq -cer '.inbounds[0].settings.clients | if type == "array" then . else error("clients must be an array") end' "$cfg")
+emails_text=$(jq -r '.[].email' <<< "$emails_json")
+emails=()
+if [[ -n $emails_text ]]; then mapfile -t emails <<< "$emails_text"; fi
 [[ ${#emails[@]} -eq 0 ]] && { echo "No users found."; exit 0; }
 for i in "${!emails[@]}"; do
-  printf "%2d) %s\n" $((i+1)) "${emails[$i]}"
+  printf '%2d) %s\n' "$((i + 1))" "${emails[$i]}"
 done
 EOS
-chmod +x /usr/local/bin/userlist
+chmod 0755 /usr/local/bin/userlist
 
 
 # --- newuser ---
 cat > /usr/local/bin/newuser <<'EOS'
 #!/bin/bash
+set -Eeuo pipefail
+umask 077
 cfg="/usr/local/etc/xray/config.json"
+tmp=""
+backup=""
+cleanup() {
+  if [[ -n ${tmp:-} ]]; then rm -f -- "$tmp"; fi
+  if [[ -n ${backup:-} ]]; then rm -f -- "$backup"; fi
+}
+trap cleanup EXIT
 read -rp "Enter new user e-mail: " email
-[[ -z $email ]] && { echo "Empty email – abort."; exit 1; }
-if jq -e --arg e "$email" '.inbounds[0].settings.clients[].email|index($e)' "$cfg" >/dev/null; then
-  echo "User already exists."; exit 1
+[[ -n $email ]] || { echo "Empty email - abort." >&2; exit 1; }
+if jq -e --arg e "$email" 'any(.inbounds[0].settings.clients[]; .email == $e)' "$cfg" >/dev/null; then
+  echo "User already exists." >&2; exit 1
 fi
-uuid=$(xray uuid)
-tmp=$(mktemp)
+uuid=$(/usr/local/bin/xray uuid)
+tmp=$(mktemp "$cfg.tmp.XXXXXX")
+backup=$(mktemp "$cfg.backup.XXXXXX")
+cp -p "$cfg" "$backup"
 jq --arg e "$email" --arg u "$uuid" \
    '.inbounds[0].settings.clients += [{"email":$e,"id":$u,"flow":"xtls-rprx-vision"}]' \
-   "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-systemctl restart xray
+   "$cfg" > "$tmp"
+/usr/local/bin/xray run -test -config "$tmp" >/dev/null
+chmod 600 "$tmp"
+mv -f "$tmp" "$cfg"
+tmp=""
+if ! systemctl restart xray || ! systemctl is-active --quiet xray; then
+  mv -f "$backup" "$cfg"
+  backup=""
+  systemctl restart xray || true
+  echo "Config restored after xray restart failed." >&2
+  exit 1
+fi
+rm -f "$backup"
+backup=""
 echo "User created."
 /usr/local/bin/sharelink "$email"
 EOS
-chmod +x /usr/local/bin/newuser
+chmod 0755 /usr/local/bin/newuser
 
 
 # --- rmuser ---
 cat > /usr/local/bin/rmuser <<'EOS'
 #!/bin/bash
+set -Eeuo pipefail
+umask 077
 cfg="/usr/local/etc/xray/config.json"
-mapfile -t emails < <(jq -r '.inbounds[0].settings.clients[].email' "$cfg")
-[[ ${#emails[@]} -eq 0 ]] && { echo "No users to delete."; exit 0; }
-
-for i in "${!emails[@]}"; do printf "%2d) %s\n" $((i+1)) "${emails[$i]}"; done
+tmp=""
+backup=""
+cleanup() {
+  if [[ -n ${tmp:-} ]]; then rm -f -- "$tmp"; fi
+  if [[ -n ${backup:-} ]]; then rm -f -- "$backup"; fi
+}
+trap cleanup EXIT
+emails_json=$(jq -cer '.inbounds[0].settings.clients | if type == "array" then . else error("clients must be an array") end' "$cfg")
+emails_text=$(jq -r '.[].email' <<< "$emails_json")
+emails=()
+if [[ -n $emails_text ]]; then mapfile -t emails <<< "$emails_text"; fi
+[[ ${#emails[@]} -gt 0 ]] || { echo "No users to delete."; exit 0; }
+for i in "${!emails[@]}"; do printf '%2d) %s\n' "$((i + 1))" "${emails[$i]}"; done
 read -rp "Choose user to delete: " idx
-(( idx>=1 && idx<=${#emails[@]} )) || { echo "Invalid choice"; exit 1; }
-
-email="${emails[$((idx-1))]}"
-tmp=$(mktemp)
+[[ $idx =~ ^[0-9]+$ ]] && ((idx >= 1 && idx <= ${#emails[@]})) || { echo "Invalid choice" >&2; exit 1; }
+email="${emails[$((idx - 1))]}"
+tmp=$(mktemp "$cfg.tmp.XXXXXX")
+backup=$(mktemp "$cfg.backup.XXXXXX")
+cp -p "$cfg" "$backup"
 jq --arg e "$email" '(.inbounds[0].settings.clients) |= map(select(.email != $e))' \
-   "$cfg" > "$tmp" && mv "$tmp" "$cfg"
-systemctl restart xray
+   "$cfg" > "$tmp"
+/usr/local/bin/xray run -test -config "$tmp" >/dev/null
+chmod 600 "$tmp"
+mv -f "$tmp" "$cfg"
+tmp=""
+if ! systemctl restart xray || ! systemctl is-active --quiet xray; then
+  mv -f "$backup" "$cfg"
+  backup=""
+  systemctl restart xray || true
+  echo "Config restored after xray restart failed." >&2
+  exit 1
+fi
+rm -f "$backup"
+backup=""
 echo "User \"$email\" deleted."
 EOS
-chmod +x /usr/local/bin/rmuser
+chmod 0755 /usr/local/bin/rmuser
 
 
 # --- sharelink ---
 cat > /usr/local/bin/sharelink <<'EOS'
 #!/bin/bash
+set -Eeuo pipefail
 cfg="/usr/local/etc/xray/config.json"
 keys="/usr/local/etc/xray/.keys"
-
-mapfile -t emails < <(jq -r '.inbounds[0].settings.clients[].email' "$cfg")
+emails_json=$(jq -cer '.inbounds[0].settings.clients | if type == "array" then . else error("clients must be an array") end' "$cfg")
+emails_text=$(jq -r '.[].email' <<< "$emails_json")
+emails=()
+if [[ -n $emails_text ]]; then mapfile -t emails <<< "$emails_text"; fi
 choose_email() {
-  [[ -n $1 ]] && { for e in "${emails[@]}"; do [[ $e == "$1" ]] && { echo "$e"; return; }; done; }
-  for i in "${!emails[@]}"; do printf "%2d) %s\n" $((i+1)) "${emails[$i]}"; done
+  local requested=${1:-} e idx i
+  if [[ -n $requested ]]; then
+    for e in "${emails[@]}"; do
+      [[ $e == "$requested" ]] && { printf '%s\n' "$e"; return; }
+    done
+    echo "User not found: $requested" >&2
+    return 1
+  fi
+  for i in "${!emails[@]}"; do printf '%2d) %s\n' "$((i + 1))" "${emails[$i]}" >&2; done
   read -rp "Choose user: " idx
-  (( idx>=1 && idx<=${#emails[@]} )) || { echo "Invalid choice"; exit 1; }
-  echo "${emails[$((idx-1))]}"
+  [[ $idx =~ ^[0-9]+$ ]] && ((idx >= 1 && idx <= ${#emails[@]})) || { echo "Invalid choice" >&2; return 1; }
+  printf '%s\n' "${emails[$((idx - 1))]}"
 }
-
-email=$(choose_email "$1")
-uuid=$(jq -r --arg e "$email" '.inbounds[0].settings.clients[]|select(.email==$e).id' "$cfg")
-proto=$(jq -r '.inbounds[0].protocol' "$cfg")
-port=$(jq -r '.inbounds[0].port'      "$cfg")
-# Поддержка обоих форматов: "Public key" и "Password"
-pbk=$(awk -F': ' '/Public key|Password/ {print $2}' "$keys" | head -n1)
-sid=$(awk -F': ' '/shortsid/ {print $2}' "$keys")
-sni=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
-ip=$(curl -4 -s ifconfig.me)
-
+email=$(choose_email "${1:-}")
+uuid=$(jq -er --arg e "$email" '.inbounds[0].settings.clients[] | select(.email == $e).id' "$cfg")
+proto=$(jq -er '.inbounds[0].protocol' "$cfg")
+port=$(jq -er '.inbounds[0].port' "$cfg")
+pbk=$(awk -F': ' '/Public key|Password/ {print $2; exit}' "$keys")
+sid=$(awk -F': ' '/shortsid/ {print $2; exit}' "$keys")
+sni=$(jq -er '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$cfg")
+ip=$(curl --fail --silent --show-error --max-time 10 -4 https://ifconfig.me)
+[[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "Unable to determine public IPv4 address" >&2; exit 1; }
 link="$proto://$uuid@$ip:$port?security=reality&sni=$sni&fp=firefox&pbk=$pbk&sid=$sid&spx=/&type=tcp&flow=xtls-rprx-vision&encryption=none#$email"
-printf "\nConnection link for %s:\n%s\n\n" "$email" "$link"
+printf '\nConnection link for %s:\n%s\n\n' "$email" "$link"
 echo "QR code:"
-echo "$link" | qrencode -t ansiutf8
+printf '%s\n' "$link" | qrencode -t ansiutf8
 EOS
-chmod +x /usr/local/bin/sharelink
+chmod 0755 /usr/local/bin/sharelink
 
 
 ### 8.  OPTIONAL: create ~/help cheat-sheet ####################################
 cat > "$HOME/xray-help" <<'EOF'
 Xray user-management commands:
 
-    mainuser   – show main user link & QR
-    userlist   – list every user
-    newuser    – create a new user
-    rmuser     – delete a user
-    sharelink  – choose user and print link / QR
+    mainuser   - show main user link and QR
+    userlist   - list every user
+    newuser    - create a new user
+    rmuser     - delete a user
+    sharelink  - choose user and print link and QR
 
 Config file:
 
@@ -269,10 +384,11 @@ Restart Xray:
 
     systemctl restart xray
 EOF
-chmod 644 "$HOME/xray-help"
+chmod 0644 "$HOME/xray-help"
 
 ### 9.  Final banner ###########################################################
-echo -e "\n[✓] Installation ver. ${XRAY_VERSION} complete. Use the following commands:\n
+XRAY_BACKUP=""
+echo -e "\n[+] Installation ver. ${XRAY_VERSION} complete. Use the following commands:\n
   mainuser   - show main user link & QR
   userlist   - list users
   newuser    - add user
