@@ -19,7 +19,7 @@ You are likely familiar with control panels like 3x-ui, Marzban, and others. All
 * 1 CPU
 * 256 Mb RAM
 * 5 Gb disk space
-* OS: Ubuntu/Debian x64
+* Supported OS: Debian x86_64 (Recommended), Ubuntu x86_64
 
 ## How to Use the Script
 
