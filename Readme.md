@@ -1,4 +1,4 @@
-![VPN Server](https://img.shields.io/badge/VPN%20Server-Online-brightgreen?style=for-the-badge&logo=openvpn)
+[![Status: Deprecated](https://img.shields.io/badge/Status-Deprecated-red?style=for-the-badge)](https://github.com/thejohnd0e/xray-vps-kit)
 [![Xray Core](https://img.shields.io/badge/Xray-Core-00BFFF?style=for-the-badge)](https://github.com/XTLS/Xray-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Shell](https://img.shields.io/badge/Shell-Bash-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
@@ -6,12 +6,21 @@
 
 # One click installation and configuration of X-ray Core Without GUI
 
+> [!WARNING]
+> **Deprecated — superseded by [Xray VPS Kit](https://github.com/thejohnd0e/xray-vps-kit).**
+> The new project continues and improves on simple-xray-core. Please use **Xray VPS Kit** for new installations and further development.
+> The instructions below are retained for reference for existing installations.
+
 You are likely familiar with control panels like 3x-ui, Marzban, and others. All of these panels are merely graphical front-ends for the X-ray core, designed to simplify its management and configuration. However, the core itself can run perfectly without any panels and can be fully managed via the terminal. The main advantage of using the "bare" core is that you don’t need to bother with domain names and TLS certificates. The core can be installed and administered manually using the official documentation. This script is intended to simplify that process: it automatically installs the core on the server, creates configuration files, and sets up several executable files for easy user management.
 
 ## Related Projects
 
-- [VLESS-to-HTTP](https://github.com/thejohnd0e/VLESS-to-HTTP) — a lightweight Dockerized **HTTP/SOCKS5 proxy** that forwards traffic through a **VLESS + Reality** server.  
-  Ideal for converting VLESS traffic into a local HTTP/SOCKS5 proxy for applications that do not support VLESS directly.
+These projects complement each other: the kits set up the servers, and the proxy containers bring a tunnel into your local network as a plain HTTP/SOCKS5 proxy.
+
+- [xray-vps-kit](https://github.com/thejohnd0e/xray-vps-kit): the successor to this project, an improved **Xray-core (VLESS + REALITY + Vision)** server installer and client manager.
+- [awg-vps-kit](https://github.com/thejohnd0e/awg-vps-kit): one-shot **AmneziaWG (UDP)** server installer and client manager. An independent alternative to Xray VPS Kit; use either kit, or both on one server.
+- [VLESS-to-HTTP](https://github.com/thejohnd0e/VLESS-to-HTTP): a Docker container that turns a `vless://` link into an **HTTP/SOCKS5 proxy**, available as a prebuilt image. With Xray VPS Kit, get the link using `xray-client show NAME`.
+- [AmneziaWG-to-Proxy](https://github.com/thejohnd0e/AmneziaWG-to-Proxy): the same idea for **AmneziaWG**, a container that turns your AmneziaWG client configs into an HTTP/SOCKS5 proxy with automatic config failover.
 
 
 ## System Requirements
